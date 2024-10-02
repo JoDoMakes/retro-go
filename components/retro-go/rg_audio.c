@@ -81,7 +81,7 @@ void rg_audio_init(int sampleRate)
             audio.sink = &sinks[i];
     }
     audio.filter = (int)rg_settings_get_number(NS_GLOBAL, SETTING_FILTER, 0);
-    audio.volume = (int)rg_settings_get_number(NS_GLOBAL, SETTING_VOLUME, 50);
+    audio.volume = (int)rg_settings_get_number(NS_GLOBAL, SETTING_VOLUME, 100);
     audio.sampleRate = sampleRate;
 
     int error_code = -1;
@@ -373,8 +373,14 @@ void rg_audio_set_mute(bool mute)
     #endif
 #endif
 
+    gpio_set_level(GPIO_NUM_25, mute ? 0 : 1);
+
     audio.muted = mute;
     RELEASE_DEVICE();
+}
+
+bool rg_audio_is_mute() {
+    return audio.muted;
 }
 
 int rg_audio_get_sample_rate(void)

@@ -433,7 +433,8 @@ void I_StartTic(void)
         }
         else if (rg_menu_delay++ == TICRATE / 2)
         {
-            rg_gui_game_menu();
+            rg_emu_save_state(0); 
+            rg_system_switch_app(RG_APP_LAUNCHER, 0, 0, 0);
         }
         realtic_clock_rate = app->speed * 100;
         R_InitInterpolation();

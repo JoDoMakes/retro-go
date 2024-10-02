@@ -19,6 +19,7 @@
 static const struct {int key, src;} keymap[] = RG_GAMEPAD_MAP;
 static const size_t keymap_size = RG_COUNT(keymap);
 static bool input_task_running = false;
+static bool volume_variable = false;
 static uint32_t gamepad_state = -1; // _Atomic
 static int battery_level = -1;
 #if defined(RG_BATTERY_ADC_CHANNEL)
@@ -32,7 +33,7 @@ static inline int battery_read(void)
 
     uint32_t adc_sample = 0;
     for (int i = 0; i < 4; ++i)
-        adc_sample += esp_adc_cal_raw_to_voltage(adc1_get_raw(RG_BATTERY_ADC_CHANNEL), &adc_chars);
+        adc_sample += esp_adc_cal_raw_to_voltage(adc1_get_raw(RG_VOLUME_ADC_CHANNEL), &adc_chars);
     return adc_sample / 4;
 
 #elif RG_GAMEPAD_DRIVER == 3 /* I2C */
@@ -57,25 +58,27 @@ static inline uint32_t gamepad_read(void)
     int joyX = adc1_get_raw(RG_GPIO_GAMEPAD_X);
     int joyY = adc1_get_raw(RG_GPIO_GAMEPAD_Y);
 
+    // if (joyX > 200) {
+    //    printf("x is %d\n", joyX);
+    // }
+
+    // if (joyY > 200) {
+    //     printf("x is %d y is %d\n", joyX, joyY);
+    // }
+   // printf("y is %d\n", joyY);
+
     // Buttons
     for (size_t i = 0; i < keymap_size; ++i)
     {
         if (!gpio_get_level(keymap[i].src))
             state |= keymap[i].key;
     }
+    
+    if (joyY < 4000) state |= RG_KEY_START;
+    if (joyX < 4000) state |= RG_KEY_SELECT;
 
-    // D-PAD
-    #ifndef RG_TARGET_RETRO_ESP32
-        if (joyY > 2048 + 1024) state |= RG_KEY_UP;
-        else if (joyY > 1024)   state |= RG_KEY_DOWN;
-        if (joyX > 2048 + 1024) state |= RG_KEY_LEFT;
-        else if (joyX > 1024)   state |= RG_KEY_RIGHT;
-    #else
-        if (joyY > 2048) state |= RG_KEY_UP;
-        else if (joyY > 1024) state |= RG_KEY_DOWN;
-        if (joyX > 2048) state |= RG_KEY_LEFT;
-        else if (joyX > 1024) state |= RG_KEY_RIGHT;
-    #endif
+   // RG_LOGI("Input state=" PRINTF_BINARY_16 "\n", PRINTF_BINVAL_16(state));
+
 
 #elif RG_GAMEPAD_DRIVER == 2  // Serial
 
@@ -183,14 +186,40 @@ static void input_task(void *arg)
 
         gamepad_state = local_gamepad_state;
 
-        if ((loop_count % 100) == 0)
-        {
-            int level = battery_read();
-            if (level > 0 && battery_level > 0)
-                battery_level = (battery_level + level) / 2;
-            else
-                battery_level = level;
-        }
+
+       // if ((loop_count % 100) == 0)
+      //  {
+            // int level = battery_read();
+            // if (level > 0 && battery_level > 0)
+            //     battery_level = (battery_level + level) / 2;
+            // else
+            //     battery_level = level;
+
+            //printf("battery_level is %d\n", battery_level);
+
+            // if (volume_variable) {
+            //     int volume_level = ((4095 - adc1_get_raw(RG_VOLUME_ADC_CHANNEL)) * 100) / 2047;
+
+            //     volume_level+=20;
+
+            //     if (volume_level < 30) volume_level = 0;
+
+            //     if (volume_level > 100) volume_level = 100;
+
+            //     //printf("volume is %d\n", volume_level);
+            //     if (rg_audio_get_volume() != volume_level){
+            //         if (rg_audio_is_mute() == false){
+            //             if (volume_level == 0){
+            //                 gpio_set_level(GPIO_NUM_25, 0);
+            //             } else {
+            //                 gpio_set_level(GPIO_NUM_25, 1);
+            //             }
+            //         }
+            //         rg_audio_set_volume(volume_level);
+            //     }
+            // }
+
+       //∂ }
 
         rg_task_delay(10);
         loop_count++;
@@ -199,6 +228,16 @@ static void input_task(void *arg)
     input_task_running = false;
     gamepad_state = -1;
     rg_task_delete(NULL);
+}
+
+void rg_input_set_volume_settings(bool volume_fixed, int volume_level){
+    RG_LOGI("RG input set value. volume_fixed=%d, level=%d\n", volume_fixed, volume_level);
+    volume_variable = !volume_fixed;
+    rg_audio_set_volume(volume_level);
+
+    if (volume_fixed && volume_level == 0) {
+        gpio_set_level(GPIO_NUM_25, 0);
+    }
 }
 
 void rg_input_init(void)
@@ -214,6 +253,24 @@ void rg_input_init(void)
     adc1_config_channel_atten(RG_GPIO_GAMEPAD_X, ADC_ATTEN_DB_11);
     adc1_config_channel_atten(RG_GPIO_GAMEPAD_Y, ADC_ATTEN_DB_11);
 
+    adc1_config_channel_atten(RG_VOLUME_ADC_CHANNEL, ADC_ATTEN_DB_11);
+
+
+    // gpio_set_direction(RG_GPIO_GAMEPAD_X_LEFT, GPIO_MODE_INPUT);
+    // gpio_set_pull_mode(RG_GPIO_GAMEPAD_X_LEFT, GPIO_PULLUP_ONLY);
+    gpio_set_direction(RG_GPIO_GAMEPAD_X_RIGHT, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(RG_GPIO_GAMEPAD_X_RIGHT, GPIO_PULLUP_ONLY);
+
+    // gpio_set_direction(RG_GPIO_GAMEPAD_Y_UP, GPIO_MODE_INPUT);
+    // gpio_set_pull_mode(RG_GPIO_GAMEPAD_Y_UP, GPIO_PULLUP_ONLY);
+    gpio_set_direction(RG_GPIO_GAMEPAD_Y_DOWN, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(RG_GPIO_GAMEPAD_Y_DOWN, GPIO_PULLUP_ONLY);
+
+
+    
+    gpio_set_direction(GPIO_NUM_25, GPIO_MODE_OUTPUT);
+    gpio_set_pull_mode(GPIO_NUM_25, GPIO_PULLUP_ONLY);
+
     gpio_set_direction(RG_GPIO_GAMEPAD_MENU, GPIO_MODE_INPUT);
     gpio_set_pull_mode(RG_GPIO_GAMEPAD_MENU, GPIO_PULLUP_ONLY);
     gpio_set_direction(RG_GPIO_GAMEPAD_OPTION, GPIO_MODE_INPUT);
@@ -221,7 +278,7 @@ void rg_input_init(void)
     gpio_set_direction(RG_GPIO_GAMEPAD_SELECT, GPIO_MODE_INPUT);
     gpio_set_pull_mode(RG_GPIO_GAMEPAD_SELECT, GPIO_PULLUP_ONLY);
     gpio_set_direction(RG_GPIO_GAMEPAD_START, GPIO_MODE_INPUT);
-    // gpio_set_pull_mode(RG_GPIO_GAMEPAD_START, GPIO_PULLUP_ONLY);
+    gpio_set_pull_mode(RG_GPIO_GAMEPAD_START, GPIO_PULLUP_ONLY);
     gpio_set_direction(RG_GPIO_GAMEPAD_A, GPIO_MODE_INPUT);
     gpio_set_pull_mode(RG_GPIO_GAMEPAD_A, GPIO_PULLUP_ONLY);
     gpio_set_direction(RG_GPIO_GAMEPAD_B, GPIO_MODE_INPUT);
@@ -282,7 +339,9 @@ void rg_input_init(void)
 #endif
 
     // Start background polling
+    RG_LOGI("Volume is variable");
     rg_task_create("rg_input", &input_task, NULL, 2 * 1024, RG_TASK_PRIORITY - 1, 1);
+
     while (gamepad_state == -1)
         rg_task_delay(1);
     RG_LOGI("Input ready. driver='%s', state=" PRINTF_BINARY_16 "\n", driver, PRINTF_BINVAL_16(gamepad_state));
@@ -356,4 +415,8 @@ const char *rg_input_get_key_name(rg_key_t key)
     case RG_KEY_NONE: return "None";
     default: return "Unknown";
     }
+}
+
+bool rg_input_quit_pressed() {
+    return false;
 }

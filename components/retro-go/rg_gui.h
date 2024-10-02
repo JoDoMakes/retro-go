@@ -253,6 +253,11 @@ enum colors565
     C_GAINSBORO                = 0xDEDB,
     C_WHITE_SMOKE              = 0xF7BE,
     C_WHITE                    = 0xFFFF,
+    C_IPOD_DARK_GRAY           = 0x4A48,
+    C_IPOD_LIGHT_GRAY          = 0xCE37,
+    C_DMG_L4_GREEN             = 0x11c2,
+    C_DMG_L1_GREEN             = 0x9dc2,
+    C_ALIEN_TURRET             = 0x9C00,
     // C_TRANSPARENT              = -1,
     C_TRANSPARENT              = C_MAGENTA,
 };

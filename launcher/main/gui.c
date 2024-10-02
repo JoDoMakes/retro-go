@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include "applications.h"
+#include "bookmarks.h"
 #include "gui.h"
 
 #define HEADER_HEIGHT       (50)
@@ -14,10 +15,10 @@
 #define PREVIEW_WIDTH       ((int)(gui.width * 0.50f))
 
 static const theme_t gui_themes[] = {
-    {{C_TRANSPARENT, C_GRAY, C_TRANSPARENT, C_WHITE}},
-    {{C_TRANSPARENT, C_GRAY, C_TRANSPARENT, C_GREEN}},
-    {{C_TRANSPARENT, C_GRAY, C_WHITE, C_BLACK}},
-    {{C_TRANSPARENT, C_DARK_GRAY, C_WHITE, C_BLACK}},
+    {{C_IPOD_LIGHT_GRAY, C_IPOD_DARK_GRAY, C_IPOD_DARK_GRAY, C_IPOD_LIGHT_GRAY}},
+    {{C_DMG_L4_GREEN, C_DMG_L1_GREEN, C_DMG_L1_GREEN, C_DMG_L4_GREEN}},
+    {{C_WHITE, C_RED, C_RED, C_WHITE}},
+    {{C_BLACK, C_ALIEN_TURRET, C_ALIEN_TURRET, C_BLACK}},
 };
 const int gui_themes_count = RG_COUNT(gui_themes);
 
@@ -56,7 +57,6 @@ void gui_init(void)
     // Always enter browse mode when leaving an emulator
     gui.browse = gui.start_screen == START_SCREEN_BROWSER ||
                  (gui.start_screen == START_SCREEN_AUTO && rg_system_get_app()->bootType == RG_RST_RESTART);
-    gui_set_theme(rg_settings_get_string(NS_GLOBAL, SETTING_THEME, NULL));
     rg_gui_set_buffered(true);
 }
 
@@ -85,6 +85,7 @@ tab_t *gui_add_tab(const char *name, const char *desc, void *arg, void *event_ha
         .capacity = 10,
         .length = 0,
         .cursor = 0,
+        .start = 0,
         .sort_mode = SORT_TEXT_ASC,
     };
 
@@ -128,12 +129,14 @@ const rg_image_t *gui_get_image(const char *type, const char *subtype)
 {
     char path[RG_PATH_MAX], name[64];
 
+
     if (subtype && *subtype)
         sprintf(name, "%s_%s.png", type, subtype);
     else
         sprintf(name, "%s.png", type);
 
     uint32_t fileid = rg_crc32(0, (uint8_t *)name, strlen(name));
+    //printf("gui_get_image %s %d \n", name, fileid);
     image_t *image = gui.images;
 
     for (; image->id; ++image)
@@ -149,13 +152,15 @@ const rg_image_t *gui_get_image(const char *type, const char *subtype)
     // Try SD card if a theme is selected
     if (gui.theme)
     {
-        sprintf(path, RG_BASE_PATH_THEMES "/%s/%s", gui.theme, name);
+        sprintf(path, RG_BASE_PATH_THEMES "/%s/%s", gui.theme, name);   
+        
         image->img = rg_image_load_from_file(path, 0);
     }
-
+   
     // Then fallback to built-in images
     if (!image->img)
     {
+
         for (const binfile_t **img = builtin_images; *img; img++)
         {
             if (strcmp((*img)->name, name) == 0)
@@ -169,7 +174,7 @@ const rg_image_t *gui_get_image(const char *type, const char *subtype)
     // Some images might need resampling
     if (strcmp(type, "background") == 0)
     {
-        if (image->img && (image->img->width != gui.width || image->img->height != gui.height))
+       if (image->img && (image->img->width != gui.width || image->img->height != gui.height))
         {
             rg_image_t *temp = rg_image_copy_resampled(image->img, gui.width, gui.height, 0);
             if (temp)
@@ -179,7 +184,6 @@ const rg_image_t *gui_get_image(const char *type, const char *subtype)
             }
         }
     }
-
     return image->img;
 }
 
@@ -315,49 +319,88 @@ void gui_scroll_list(tab_t *tab, scroll_whence_t mode, int arg)
 
     int cur_cursor = RG_MAX(RG_MIN(list->cursor, list->length - 1), 0);
     int old_cursor = list->cursor;
+    int max_lines = 10;
 
     if (list->length == 0)
     {
         // cur_cursor = -1;
         cur_cursor = 0;
+    } else if (mode == SCROLL_LINE)
+    {
+        cur_cursor += arg;
     }
     else if (mode == SCROLL_SET)
     {
         cur_cursor = arg;
     }
-    else if (mode == SCROLL_LINE)
-    {
-        cur_cursor += arg;
-    }
     else if (mode == SCROLL_PAGE)
     {
-        // int start = list->items[cur_cursor].text[0];
-        int direction = arg > 0 ? 1 : -1;
-        for (int max = max_visible_lines(tab, NULL); max > 0; --max)
-        {
-            cur_cursor += direction;
-            if (cur_cursor < 0 || cur_cursor >= list->length)
-                break;
-            // if (start != list->items[cur_cursor].text[0])
-            //     break;
-        }
+        cur_cursor = arg > 0 ? cur_cursor + max_lines : cur_cursor - max_lines;
     }
 
-    if (cur_cursor < 0) cur_cursor = list->length - 1;
-    if (cur_cursor >= list->length) cur_cursor = 0;
+
+
+    if (cur_cursor < 0) cur_cursor = 0;
+    if (cur_cursor >= list->length) cur_cursor = list->length - 1;
+
+    if (cur_cursor != old_cursor)
+    {
+        if (list->length > max_lines){
+            if (cur_cursor < list->start){
+                list->start = cur_cursor;
+            } else if (cur_cursor >= list->start + max_lines){
+                list->start = (cur_cursor - max_lines) + 1;
+            } 
+        }
+
+    }
 
     list->cursor = cur_cursor;
 
-    if (list->length && list->items[list->cursor].arg)
-        sprintf(tab->status[0].left, "%d / %d", (list->cursor + 1) % 10000, list->length % 10000);
-    else
-        strcpy(tab->status[0].left, "List empty");
+    // if (list->length && list->items[list->cursor].arg)
+    //     sprintf(tab->status[0].left, "%d / %d", (list->cursor + 1) % 10000, list->length % 10000);
+    // else
+    //     strcpy(tab->status[0].left, "List empty");
 
     gui_event(TAB_SCROLL, tab);
 
     if (cur_cursor != old_cursor)
     {
         gui_redraw();
+    }
+}
+
+void draw_header(const char* label){
+    const theme_t *theme = &gui_themes[gui.color_theme % gui_themes_count];
+    rg_color_t fg[2] = {theme->list.standard_fg, theme->list.selected_fg};
+    rg_color_t bg[2] = {theme->list.standard_bg, theme->list.selected_bg};
+    rg_gui_draw_text(0, 4, gui.width, label, fg[0], bg[0], RG_TEXT_ALIGN_CENTER);
+    rg_gui_draw_rect(0, 20, gui.width, 1, 0, fg[0], fg[0]);
+
+    //rg_gui_draw_battery(-22, 3);
+}
+
+void gui_draw_default_background(){
+    const theme_t *theme = &gui_themes[gui.color_theme % gui_themes_count];
+    rg_gui_draw_rect(0, 0, gui.width, gui.height, 0, theme->list.standard_bg, theme->list.standard_bg);
+}
+
+void draw_tab_list(){
+    const theme_t *theme = &gui_themes[gui.color_theme % gui_themes_count];
+    rg_color_t bg[2] = {theme->list.standard_bg, theme->list.selected_bg};
+    rg_color_t fg[2] = {theme->list.standard_fg, theme->list.selected_fg};
+    uint8_t top = 21;
+    uint8_t line_height = 20;
+    uint8_t line_t_padding = 2;
+    unsigned i;
+    for(i = 0; i < gui.tabs_count; i++){
+        tab_t *tab = gui.tabs[i];
+        if (i == gui.selected_tab){
+            rg_gui_draw_rect(0, i * line_height + top, gui.width, line_height, 0, bg[1], bg[1]);
+        }
+        rg_gui_draw_text(10, i * line_height + top + line_t_padding, 0, tab->desc, i == gui.selected_tab ? fg[1] : fg[0], C_TRANSPARENT, RG_TEXT_ALIGN_LEFT);
+        rg_gui_draw_text(gui.width - 25, i * line_height + top + line_t_padding, 15, ">", i == gui.selected_tab ? fg[1] : fg[0], C_TRANSPARENT, RG_TEXT_ALIGN_LEFT);
+ 
     }
 }
 
@@ -370,21 +413,17 @@ void gui_redraw(void)
     }
     else if (gui.browse)
     {
-        gui_draw_background(tab, 4);
+        gui_draw_default_background();
         gui_draw_header(tab, 0);
-        gui_draw_status(tab);
         gui_draw_list(tab);
-        if (tab->preview)
-        {
-            int height = RG_MIN(tab->preview->height, PREVIEW_HEIGHT);
-            int width = RG_MIN(tab->preview->width, PREVIEW_WIDTH);
-            rg_gui_draw_image(-width, -height, width, height, true, tab->preview);
-        }
     }
     else
     {
-        gui_draw_background(tab, 0);
-        gui_draw_header(tab, (gui.height - HEADER_HEIGHT) / 2);
+        gui_draw_default_background();
+        draw_header("GamePod");
+        draw_tab_list();
+        // gui_draw_background(tab, 0);
+        // gui_draw_header(tab, (gui.height - HEADER_HEIGHT) / 2);
     }
     rg_gui_flush();
 }
@@ -414,14 +453,84 @@ void gui_draw_background(tab_t *tab, int shade)
         }
         img = buffer;
     }
-
+  
     rg_gui_draw_image(0, 0, gui.width, gui.height, false, img);
+}
+
+uint16_t greyScale(uint16_t rbg565) {
+    // Get the values (32-bit to hold larger intermediate values).
+
+    uint32_t r = (rbg565 >> 11) & 0x1F; // XXXXX___________
+    uint32_t g = rbg565         & 0x1F; // ___________XXXXX
+    uint32_t b = (rbg565 >> 5)  & 0x3F; // _____XXXXXX_____
+    // int r = ((rbg565 >> 11) & 0x1F);
+    // int g = ((rbg565 >> 5) & 0x3F);
+    // int b = ((rbg565) & 0x1F);
+
+    // Scale each of them up to the range 0..500.
+
+    g = g * 500 / 31;
+    b = b * 500 / 63;
+    r = r * 500 / 31;
+
+    // Use example RGB weights of 299/587/114 (summing to 1,000).
+    // Range then 0..500,000 so divide by 500 to get grey 0..1,000.
+
+    uint32_t grey = (500 * 299 + 0 * 587 + 0 * 114);
+    grey /= 500;
+    return (uint16_t)r | b | g;
+}
+
+rg_image_t *gui_get_themed_image(const char *image_path)
+{
+    const theme_t *theme = &gui_themes[gui.color_theme % gui_themes_count];
+    rg_color_t tint_color = theme->list.selected_fg > theme->list.standard_fg ? theme->list.selected_fg : theme->list.standard_fg;
+    static rg_image_t *buffer = NULL;
+    static void *buffer_content = 0;
+
+    const rg_image_t *img = rg_image_load_from_file(image_path, 0);
+
+    
+    // Only regenerate the shaded buffer if the background has changed
+    if (!buffer) {
+        free(buffer);
+        buffer = NULL;
+    }
+    buffer = rg_image_alloc(img->width, img->height);
+    uint32_t r, g, b;
+    uint32_t rtint, gtint, btint;
+
+    for (int x = 0; x < buffer->width * buffer->height; ++x)
+    {
+        int pixel = img->data[x];
+        r = ((pixel >> 11) & 0x1F);
+        g = ((pixel >> 5) & 0x3F);
+        b = ((pixel) & 0x1F);
+
+        rtint = ((tint_color >> 11) & 0x1F);
+        gtint = ((tint_color >> 5) & 0x3F);
+        btint = ((tint_color) & 0x1F);
+
+        r = r * rtint / 31;
+        g = g * gtint / 63;
+        b = b * btint / 31;
+
+        buffer->data[x] = ((r & 0x1F) << 11) | ((g & 0x3F) << 5) | ((b & 0x1F) << 0);
+    }
+    buffer_content = (void*)img;
+    img = buffer;
+
+  
+    return img;
 }
 
 void gui_draw_header(tab_t *tab, int offset)
 {
-    rg_gui_draw_image(0, offset, LOGO_WIDTH, HEADER_HEIGHT, false, gui_get_image("logo", tab->name));
-    rg_gui_draw_image(LOGO_WIDTH + 1, offset + 8, 0, HEADER_HEIGHT - 8, false, gui_get_image("banner", tab->name));
+    if (tab->navpath){
+        draw_header(rg_basename(tab->navpath));
+    } else {
+        draw_header(tab->desc);
+    }
 }
 
 void gui_draw_status(tab_t *tab)
@@ -451,36 +560,102 @@ void gui_draw_list(tab_t *tab)
     rg_color_t bg[2] = {theme->list.standard_bg, theme->list.selected_bg};
 
     const listbox_t *list = &tab->listbox;
-    int line_height, top = HEADER_HEIGHT + 6;
-    int lines = max_visible_lines(tab, &line_height);
-    int line_offset = 0;
+    int max_lines = 10;
+    int start_position = list->start;
+    int total_items = list->length;
 
-    if (tab->navpath)
-    {
-        char buffer[64];
-        snprintf(buffer, 63, "[%s]",  tab->navpath);
-        top += rg_gui_draw_text(0, top, gui.width, buffer, fg[0], bg[0], 0).height;
+    if (total_items < max_lines){
+        max_lines = total_items;
     }
 
-    top += ((gui.height - top) - (lines * line_height)) / 2;
+    
 
-    if (gui.scroll_mode == SCROLL_MODE_PAGING)
-    {
-        line_offset = (list->cursor / lines) * lines;
-    }
-    else // (gui.scroll_mode == SCROLL_MODE_CENTER)
-    {
-        line_offset = list->cursor - (lines / 2);
+    uint8_t top = 21;
+    uint8_t line_height = 20;
+    uint8_t line_t_padding = 2;
+    uint16_t idx;
+    listbox_item_t *item;
+    retro_file_t *file;
+
+    if (total_items == 0){
+        rg_gui_draw_text(10, (gui.height - 20) / 2, gui.width - 20, "", fg[0], C_TRANSPARENT, RG_TEXT_ALIGN_CENTER);
     }
 
-    for (int i = 0; i < lines; i++)
+
+    for (uint8_t i = 0; i < max_lines; i++)
     {
-        int idx = line_offset + i;
-        int selected = idx == list->cursor;
-        char *label = (idx >= 0 && idx < list->length) ? list->items[idx].text : "";
-        top += rg_gui_draw_text(0, top, gui.width, label, fg[selected], bg[selected], 0).height;
+        idx = start_position + i;
+        bool selected = idx == list->cursor;
+        item = &list->items[idx];
+        file = (retro_file_t *)(item ? item->arg : NULL);
+
+        if (selected){
+            rg_gui_draw_rect(0, i * line_height + top, gui.width, line_height, 0, bg[1], bg[1]);
+        }
+        rg_gui_draw_text(10, i * line_height + top + line_t_padding, gui.width - 10, item->text, selected ? fg[1] : fg[0], C_TRANSPARENT, RG_TEXT_ALIGN_RIGHT);
+
+        if (file && file->type == 0xFF) {
+            rg_gui_draw_text(10, i * line_height + top + line_t_padding, gui.width - 10, " > ", selected ? fg[1] : fg[0], C_TRANSPARENT, RG_TEXT_ALIGN_RIGHT);
+        }
+    }
+
+    if (total_items > max_lines){
+        
+
+        uint8_t scroll_height = gui.height - (top + 20);
+        uint8_t scrollbar_height = (scroll_height * max_lines) / total_items;
+        uint8_t scrollbar_offset = ((scroll_height - scrollbar_height) * (list->start)) / (total_items - max_lines);
+        rg_gui_draw_rect(gui.width - 12, top, 12, scroll_height + 4, 1, fg[0], bg[0]);
+        rg_gui_draw_rect(gui.width - 10, scrollbar_offset + top + 2, 8, scrollbar_height, 0, fg[0], fg[0]);
     }
 }
+
+void gui_draw_optionlist(listbox_t *list)
+{
+    const theme_t *theme = &gui_themes[gui.color_theme % gui_themes_count];
+    rg_color_t fg[2] = {theme->list.standard_fg, theme->list.selected_fg};
+    rg_color_t bg[2] = {theme->list.standard_bg, theme->list.selected_bg};
+
+    int max_lines = 10;
+    int start_position = list->start;
+    int total_items = list->length;
+
+    if (total_items < max_lines){
+        max_lines = total_items;
+    }
+
+    uint8_t top = 21;
+    uint8_t line_height = 20;
+    uint8_t line_t_padding = 2;
+    uint16_t idx;
+    listbox_item_t *item;
+
+    if (total_items == 0){
+        rg_gui_draw_text(10, (gui.height - 20) / 2, gui.width - 20, "List is empty :(", fg[0], C_TRANSPARENT, RG_TEXT_ALIGN_CENTER);
+    }
+
+
+    for (uint8_t i = 0; i < max_lines; i++)
+    {
+        idx = start_position + i;
+        bool selected = idx == list->cursor;
+        item = &list->items[idx];
+
+        if (selected){
+            rg_gui_draw_rect(0, i * line_height + top, gui.width, line_height, 0, bg[1], bg[1]);
+        }
+        rg_gui_draw_text(10, i * line_height + top + line_t_padding, 0, item->text, selected ? fg[1] : fg[0], C_TRANSPARENT, RG_TEXT_ALIGN_LEFT);
+    }
+
+    if (total_items > max_lines){
+        uint8_t scroll_height = gui.height - (top + 20);
+        uint8_t scrollbar_height = (scroll_height * max_lines) / total_items;
+        uint8_t scrollbar_offset = ((scroll_height - scrollbar_height) * (list->start)) / (total_items - max_lines);
+        rg_gui_draw_rect(gui.width - 12, top, 12, scroll_height + 4, 1, fg[0], bg[0]);
+        rg_gui_draw_rect(gui.width - 10, scrollbar_offset + top + 2, 8, scrollbar_height, 0, fg[0], fg[0]);
+    }
+}
+
 
 void gui_set_preview(tab_t *tab, rg_image_t *preview)
 {
@@ -498,6 +673,7 @@ void gui_load_preview(tab_t *tab)
     listbox_item_t *item = gui_get_selected_item(tab);
     bool show_missing_cover = false;
     char path[RG_PATH_MAX + 1];
+        
     size_t path_len;
     uint32_t order;
 
@@ -581,7 +757,55 @@ void gui_load_preview(tab_t *tab)
     {
         RG_LOGI("No image found for '%s'\n", file->name);
         gui_set_status(tab, NULL, errors ? "Bad cover" : "No cover");
-        // gui_draw_status(tab);
-        // tab->preview = gui_get_image("cover", file->app);
     }
+}
+
+
+void gui_draw_rom_details(char *title, char *system_name, char *genre, rg_image_t *cover_image, bool has_save, bool is_fav, int selected){
+    const theme_t *theme = &gui_themes[gui.color_theme % gui_themes_count];
+    rg_color_t fg[2] = {theme->list.standard_fg, theme->list.selected_fg};
+    rg_color_t bg[2] = {theme->list.standard_bg, theme->list.selected_bg};
+
+    int details_l_margin =  186;
+
+    gui_draw_default_background();
+    draw_header(title);
+
+    rg_gui_draw_text(0, 220, gui.width, system_name, theme->list.standard_fg, C_TRANSPARENT, RG_TEXT_ALIGN_CENTER);
+    rg_gui_draw_text(0, 200, gui.width, genre, theme->list.standard_fg, C_TRANSPARENT, RG_TEXT_ALIGN_CENTER);
+
+
+    rg_gui_draw_image(90 - (cover_image->width / 2), 30, cover_image->width, cover_image->height, false, cover_image);
+
+    if (has_save) {
+        draw_button("Continue", details_l_margin, 33, 60, selected == 0);
+        draw_button("Start", details_l_margin, 63, 60, selected == 1);
+        draw_button(is_fav ? "unFav." : "Fav.", details_l_margin, 100, 60, selected == 2);
+    } else {
+        draw_button("Start", details_l_margin, 33, 60, selected == 0);
+        draw_button(is_fav ? "unFav." : "Fav.", details_l_margin, 73, 60, selected == 1);
+    }
+
+}
+
+void draw_button(char* label, int x, int y, int width, bool selected){
+    const theme_t *theme = &gui_themes[gui.color_theme % gui_themes_count];
+    rg_color_t fg[2] = {theme->list.standard_fg, theme->list.selected_fg};
+    rg_color_t bg[2] = {theme->list.standard_bg, theme->list.selected_bg};
+
+    int padding_h = 4;
+    int padding_v = 4;
+    rg_color_t *text_color = selected ? &theme->list.selected_fg : &theme->list.standard_fg;
+    rg_color_t *border_color = selected ? &theme->list.selected_fg : &theme->list.standard_fg;
+    rg_color_t *fill_color = selected ? &theme->list.selected_bg : &theme->list.standard_bg;
+    rg_rect_t text_bb = rg_gui_draw_text(x, y, width, label, *text_color, C_TRANSPARENT, RG_TEXT_ALIGN_CENTER);
+
+    rg_gui_draw_rect(x - padding_h, y - padding_v, text_bb.width + (padding_h * 2), text_bb.height + (padding_v * 2), 0, *border_color, *border_color);
+    rg_gui_draw_rect(x - padding_h - 1, y - padding_v + 1, text_bb.width + (padding_h * 2) + 2, text_bb.height + (padding_v * 2) - 2, 0, *border_color, *border_color);
+    rg_gui_draw_rect(x - padding_h - 2, y - padding_v + 2, text_bb.width + (padding_h * 2) + 4, text_bb.height + (padding_v * 2) - 4, 0, *border_color, *border_color);
+    
+    rg_gui_draw_rect(x - padding_h, y - padding_v + 1, text_bb.width + (padding_h * 2), text_bb.height + (padding_v * 2) - 2, 0, *border_color, *fill_color);
+    rg_gui_draw_rect(x - padding_h - 1, y - padding_v + 2, text_bb.width + (padding_h * 2) + 2, text_bb.height + (padding_v * 2) - 4, 0, *border_color, *fill_color);
+
+    rg_gui_draw_text(x, y, width, label, *text_color, C_TRANSPARENT, RG_TEXT_ALIGN_CENTER);
 }

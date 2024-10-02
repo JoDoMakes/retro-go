@@ -11,6 +11,7 @@
 #define RG_BASE_PATH_COVERS RG_STORAGE_ROOT "/romart"
 #define RG_BASE_PATH_MUSIC  RG_STORAGE_ROOT "/music"
 #define RG_BASE_PATH_ROMS   RG_STORAGE_ROOT "/roms"
+#define RG_BASE_PATH_ROM_META   RG_STORAGE_ROOT "/romsmeta"
 #define RG_BASE_PATH_SAVES  RG_BASE_PATH "/saves"
 #define RG_BASE_PATH_THEMES RG_BASE_PATH "/themes"
 

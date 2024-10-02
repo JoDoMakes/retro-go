@@ -241,10 +241,10 @@ void app_main(void)
 
     app = rg_system_init(AUDIO_SAMPLE_RATE / 2, &handlers, options);
 
-    yfm_enabled = rg_settings_get_number(NS_APP, SETTING_YFM_EMULATION, 1);
+    yfm_enabled = rg_settings_get_number(NS_APP, SETTING_YFM_EMULATION, 0);
     sn76489_enabled = rg_settings_get_number(NS_APP, SETTING_SN76489_EMULATION, 0);
     // yfm_resample = rg_settings_get_number(NS_APP, SETTING_YFM_RESAMPLE, 1);
-    z80_enabled = rg_settings_get_number(NS_APP, SETTING_Z80_EMULATION, 1);
+    z80_enabled = rg_settings_get_number(NS_APP, SETTING_Z80_EMULATION, 0);
     frameskip = rg_settings_get_number(NS_APP, SETTING_FRAMESKIP, frameskip);
 
     updates[0].buffer = rg_alloc(320 * 240, MEM_FAST);
@@ -294,7 +294,7 @@ void app_main(void)
     uint32_t joystick = 0, joystick_old;
     uint32_t frames = 0;
 
-    RG_LOGI("rg_display_set_source_format()\n");
+    rg_audio_set_mute(true);
 
     RG_LOGI("emulation loop\n");
     while (true)
@@ -304,10 +304,13 @@ void app_main(void)
 
         if (joystick & (RG_KEY_MENU | RG_KEY_OPTION))
         {
-            if (joystick & RG_KEY_MENU)
-                rg_gui_game_menu();
-            else
-                rg_gui_options_menu();
+            // if (joystick & RG_KEY_MENU)
+            //     rg_gui_game_menu();
+            // else
+            //     rg_gui_options_menu();
+            rg_audio_set_mute(true);
+            rg_emu_save_state(0);
+            rg_system_switch_app(RG_APP_LAUNCHER, 0, 0, 0);
         }
         else if (joystick != joystick_old)
         {

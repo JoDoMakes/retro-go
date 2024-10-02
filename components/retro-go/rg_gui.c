@@ -78,11 +78,11 @@ bool rg_gui_set_theme(const char *theme_name)
             RG_LOGE("Failed to load theme '%s'!\n", theme_name);
     }
 
-    gui.style.box_background = get_theme_value(theme, "box_background", C_NAVY);
+    gui.style.box_background = get_theme_value(theme, "box_background", C_IPOD_DARK_GRAY);
     gui.style.box_header = get_theme_value(theme, "box_header", C_WHITE);
-    gui.style.box_border = get_theme_value(theme, "box_border", C_DIM_GRAY);
+    gui.style.box_border = get_theme_value(theme, "box_border", C_IPOD_DARK_GRAY);
     gui.style.item_standard = get_theme_value(theme, "item_standard", C_WHITE);
-    gui.style.item_disabled = get_theme_value(theme, "item_disabled", C_GRAY);
+    gui.style.item_disabled = get_theme_value(theme, "item_disabled", C_IPOD_LIGHT_GRAY);
     gui.style.scrollbar = get_theme_value(theme, "scrollbar", C_WHITE);
 
     RG_LOGI("Theme set to '%s'!\n", theme_name ?: "(none)");
@@ -470,12 +470,12 @@ void rg_gui_draw_clock(int x_pos, int y_pos)
 
 void rg_gui_draw_hourglass(void)
 {
-    rg_display_write((gui.screen_width / 2) - (image_hourglass.width / 2),
-        (gui.screen_height / 2) - (image_hourglass.height / 2),
-        image_hourglass.width,
-        image_hourglass.height,
-        image_hourglass.width * 2,
-        (uint16_t*)image_hourglass.pixel_data);
+    // rg_display_write((gui.screen_width / 2) - (image_hourglass.width / 2),
+    //     (gui.screen_height / 2) - (image_hourglass.height / 2),
+    //     image_hourglass.width,
+    //     image_hourglass.height,
+    //     image_hourglass.width * 2,
+    //     (uint16_t*)image_hourglass.pixel_data);
 }
 
 void rg_gui_clear(rg_color_t color)
@@ -722,7 +722,7 @@ int rg_gui_dialog(const char *title, const rg_gui_option_t *options_const, int s
     }
     RG_LOGD("text_buffer usage = %d\n", (intptr_t)(text_buffer_ptr - text_buffer));
 
-    rg_gui_draw_status_bars();
+   // rg_gui_draw_status_bars();
     rg_gui_draw_dialog(title, options, sel);
     rg_input_wait_for_key(RG_KEY_ALL, false);
     rg_task_delay(100);

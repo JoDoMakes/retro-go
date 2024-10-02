@@ -18,6 +18,14 @@ typedef struct
     retro_app_t *app;
 } retro_file_t;
 
+typedef struct
+{
+    char name[64];
+    char release_date[16];
+    char publisher[64];
+    char genre[96];
+} retro_file_metadata_t;
+
 typedef struct retro_app_s
 {
     char description[64];
@@ -43,6 +51,8 @@ typedef struct tab_s tab_t;
 
 void applications_init(void);
 void application_show_file_menu(retro_file_t *file, bool simplified);
+void application_show_file_info(retro_file_t *file);
 bool application_get_file_crc32(retro_file_t *file);
 bool application_path_to_file(const char *path, retro_file_t *out_file);
 void crc_cache_idle_task(tab_t *tab);
+void application_display_file_details(retro_file_t *file);

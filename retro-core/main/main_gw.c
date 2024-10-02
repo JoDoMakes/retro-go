@@ -228,9 +228,14 @@ void gw_main(void)
         // hardware keys
         uint32_t joystick = rg_input_read_gamepad();
 
-        if (joystick & RG_KEY_MENU)
-            rg_gui_game_menu();
-        else if (joystick & RG_KEY_OPTION)
+        if (joystick & RG_KEY_MENU){
+            //rg_gui_game_menu();
+            rg_audio_set_mute(true);
+            rg_emu_save_state(0);
+            rg_system_switch_app(RG_APP_LAUNCHER, 0, 0, 0);
+        }
+            
+        //else if (joystick & RG_KEY_OPTION)
             rg_gui_options_menu();
 
         // soft keys emulation

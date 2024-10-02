@@ -12,7 +12,7 @@
 
 #include "applications.h"
 #include "bookmarks.h"
-#include "music.h"
+#include "settings.h"
 #include "gui.h"
 #include "wifi.h"
 #include "updater.h"
@@ -233,7 +233,7 @@ static rg_gui_event_t about_app_cb(rg_gui_option_t *option, rg_gui_event_t event
     return RG_DIALOG_VOID;
 }
 
-static void retro_loop(void)
+static void retro_loop()
 {
     tab_t *tab = NULL;
     int64_t next_repeat = 0;
@@ -247,11 +247,8 @@ static void retro_loop(void)
     gui_init();
     applications_init();
     bookmarks_init();
-    music_init();
-
-#ifdef RG_ENABLE_NETWORKING
-    wifi_init();
-#endif
+    settings_init();
+    rg_audio_set_mute(true);
 
     tab = gui_get_current_tab();
     if (!tab)
@@ -259,8 +256,9 @@ static void retro_loop(void)
         gui.selected_tab = 0;
         tab = gui_get_current_tab();
     }
+    
 
-    while (true)
+    while (rg_input_quit_pressed() == false)
     {
         // At the moment the HTTP server has absolute priority because it may change UI elements.
         // It's also risky to let the user do file accesses at the same time (thread safety, SPI, etc)...
@@ -324,20 +322,20 @@ static void retro_loop(void)
             }
         }
 
-        if (joystick & (RG_KEY_MENU|RG_KEY_OPTION))
-        {
-        #if RG_GAMEPAD_HAS_OPTION_BTN
-            if (joystick == RG_KEY_MENU)
-                show_about_menu();
-            else
-        #endif
-            rg_gui_options_menu();
+        // if (joystick & (RG_KEY_MENU|RG_KEY_OPTION))
+        // {
+        // #if RG_GAMEPAD_HAS_OPTION_BTN
+        //     if (joystick == RG_KEY_MENU)
+        //         show_about_menu();
+        //     else
+        // #endif
+        //     rg_gui_options_menu();
 
-            gui_set_theme(rg_gui_get_theme());
-            gui_save_config();
-            rg_settings_commit();
-            redraw_pending = true;
-        }
+        //     gui_set_theme(rg_gui_get_theme());
+        //     gui_save_config();
+        //     rg_settings_commit();
+        //     redraw_pending = true;
+        // }
 
         if (gui.browse)
         {
@@ -409,37 +407,12 @@ static void retro_loop(void)
             rg_task_delay(10);
         }
 
+        gui_redraw();
+
         rg_system_tick(0);
-    }
+   }
 }
 
-static void try_migrate(void)
-{
-    // A handful of retro-go versions used the weird /odroid/*.txt to store books. Let's move them!
-    if (rg_settings_get_number(NS_GLOBAL, "Migration", 0) < 1290)
-    {
-    #ifdef RG_TARGET_ODROID_GO
-        rg_storage_mkdir(RG_BASE_PATH_CONFIG);
-        rename(RG_STORAGE_ROOT "/odroid/favorite.txt", RG_BASE_PATH_CONFIG "/favorite.txt");
-        rename(RG_STORAGE_ROOT "/odroid/recent.txt", RG_BASE_PATH_CONFIG "/recent.txt");
-    #endif
-        rg_settings_set_number(NS_GLOBAL, "Migration", 1290);
-        rg_settings_commit();
-    }
-
-    // Some of our save formats have diverged and cause issue when they're shared with Go-Play
-    if (rg_settings_get_number(NS_GLOBAL, "Migration", 0) < 1390)
-    {
-    #ifdef RG_TARGET_ODROID_GO
-        if (access(RG_STORAGE_ROOT "/odroid/data", F_OK) == 0)
-            rg_gui_alert("Save path changed in 1.32",
-                "Save format is no longer fully compatible with Go-Play and can cause corruption.\n\n"
-                "Please copy the contents of:\n /odroid/data\nto\n /retro-go/saves.");
-    #endif
-        rg_settings_set_number(NS_GLOBAL, "Migration", 1390);
-        rg_settings_commit();
-    }
-}
 
 void event_handler(int event, void *arg)
 {
@@ -479,7 +452,6 @@ void app_main(void)
     {
         rg_storage_mkdir(RG_BASE_PATH_CACHE);
         rg_storage_mkdir(RG_BASE_PATH_CONFIG);
-        try_migrate();
     }
 
 #ifdef CONFIG_IDF_TARGET
@@ -489,5 +461,5 @@ void app_main(void)
     heap_caps_malloc_extmem_enable(1024);
 #endif
 
-    retro_loop();
+   retro_loop();
 }

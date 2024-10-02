@@ -283,9 +283,8 @@ static void enter_recovery_mode(void)
     RG_LOGW("Entering recovery mode...\n");
 
     const rg_gui_option_t options[] = {
-        {0, "Reset all settings", NULL, 1, NULL},
-        {1, "Reboot to factory ", NULL, 1, NULL},
-        {2, "Reboot to launcher", NULL, 1, NULL},
+        //{0, "Reset all settings", NULL, 1, NULL},
+        {2, "Reboot to home", NULL, 1, NULL},
         RG_DIALOG_CHOICE_LAST,
     };
     while (true)
@@ -401,7 +400,7 @@ rg_app_t *rg_system_init(int sampleRate, const rg_handlers_t *handlers, const rg
             continue;
         rg_display_init();
         rg_gui_init();
-        enter_recovery_mode();
+        enter_recovery_mode(); 
     }
 
     rg_settings_init();
@@ -410,6 +409,8 @@ rg_app_t *rg_system_init(int sampleRate, const rg_handlers_t *handlers, const rg
     app.bootFlags = rg_settings_get_number(NS_BOOT, SETTING_BOOT_FLAGS, 0);
     app.saveSlot = (app.bootFlags & RG_BOOT_SLOT_MASK) >> 4;
     app.romPath = app.bootArgs;
+
+    rg_input_set_volume_settings(rg_settings_get_number(NS_GLOBAL, "VolumeMode", 0) == 0, rg_settings_get_number(NS_GLOBAL, "Volume", 50));
 
     rg_display_init();
     rg_gui_init();

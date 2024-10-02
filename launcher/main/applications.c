@@ -36,6 +36,15 @@ static const char *get_file_path(retro_file_t *file)
     return buffer;
 }
 
+static const char *get_meta_path(retro_file_t *file, bool image)
+{
+    static char buffer[RG_PATH_MAX + 1];
+    RG_ASSERT(file, "Bad param");
+    char *path_beginning = file->folder + strlen(RG_BASE_PATH_ROMS) + 1;
+    snprintf(buffer, RG_PATH_MAX, "%s/%s/%s%s", RG_BASE_PATH_ROM_META, path_beginning, file->name, image ? "-grayscale.png" : ".txt");
+    return buffer;
+}
+
 static void scan_folder(retro_app_t *app, const char* path, void *parent)
 {
     RG_ASSERT(app && path, "Bad param");
@@ -326,15 +335,19 @@ static void tab_refresh(tab_t *tab)
             if (!file->is_valid || !file->name)
                 continue;
 
-            if (file->folder != folder && strcmp(file->folder, folder) != 0)
+            if (file->type == 0xFF)
+            {
                 continue;
+            }
+
+            //if (file->folder != folder && strcmp(file->folder, folder) != 0)
+            //    continue;
 
             listbox_item_t *item = &tab->listbox.items[items_count++];
 
             if (file->type == 0xFF)
             {
-                snprintf(item->text, 128, "[%s]", file->name);
-                // snprintf(item->text, 128, "/%s/", file->name);
+                snprintf(item->text, 128, "%s", file->name);
             }
             else
             {
@@ -352,14 +365,14 @@ static void tab_refresh(tab_t *tab)
 
     if (items_count == 0)
     {
-        gui_resize_list(tab, 6);
-        sprintf(tab->listbox.items[0].text, "Welcome to Retro-Go!");
-        sprintf(tab->listbox.items[1].text, " ");
-        sprintf(tab->listbox.items[2].text, "Place roms in folder: %s", rg_relpath(app->paths.roms));
-        sprintf(tab->listbox.items[3].text, "With file extension: %s", app->extensions);
-        sprintf(tab->listbox.items[4].text, " ");
-        sprintf(tab->listbox.items[5].text, "You can hide this tab in the menu");
-        tab->listbox.cursor = 4;
+        gui_resize_list(tab, 0);
+        // sprintf(tab->listbox.items[0].text, "Welcome to Retro-Go!");
+        // sprintf(tab->listbox.items[1].text, " ");
+        // sprintf(tab->listbox.items[2].text, "Place roms in folder: %s", rg_relpath(app->paths.roms));
+        // sprintf(tab->listbox.items[3].text, "With file extension: %s", app->extensions);
+        // sprintf(tab->listbox.items[4].text, " ");
+        // sprintf(tab->listbox.items[5].text, "You can hide this tab in the menu");
+        tab->listbox.cursor = 0;
     }
 
     gui_scroll_list(tab, SCROLL_SET, tab->listbox.cursor);
@@ -374,7 +387,7 @@ static void event_handler(gui_event_t event, tab_t *tab)
     if (event == TAB_INIT)
     {
         retro_file_t *selected = bookmark_find_by_app(BOOK_TYPE_RECENT, app);
-        tab->navpath = selected ? selected->folder : NULL;
+        tab->navpath = NULL;
 
         application_init(app);
         tab_refresh(tab);
@@ -424,7 +437,8 @@ static void event_handler(gui_event_t event, tab_t *tab)
             }
             else
             {
-                application_show_file_menu(file, false);
+                application_display_file_details(file);
+
             }
         }
     }
@@ -582,6 +596,163 @@ static void show_file_info(retro_file_t *file)
     }
 }
 
+const retro_file_metadata_t* get_file_meta(const char *filepath)
+{
+    static retro_file_metadata_t file_metadata;
+
+    FILE * fp;
+    size_t len = 0;
+    ssize_t read;
+    char line_buffer[169] = {0};
+
+    fp = fopen(filepath, "r");
+    if (fp == NULL){
+        RG_LOGE("Failed to read meta file %s!\n", filepath);
+        return NULL;
+    }
+
+    fgets(line_buffer, 168, fp);
+
+    fgets(line_buffer, 168, fp);
+    len = strlen(line_buffer);
+    if (line_buffer[len - 1] == '\n')
+        line_buffer[len - 1] = 0;
+    snprintf(file_metadata.name, sizeof(file_metadata.name), "%s", line_buffer);
+
+    fgets(line_buffer, 168, fp);
+    len = strlen(line_buffer);
+    if (line_buffer[len - 1] == '\n')
+        line_buffer[len - 1] = 0;
+    snprintf(file_metadata.release_date, sizeof(file_metadata.release_date), "%s", line_buffer);
+    
+    fgets(line_buffer, 168, fp); fgets(line_buffer, 168, fp);
+    
+    fgets(line_buffer, 168, fp);
+    len = strlen(line_buffer);
+    if (line_buffer[len - 1] == '\n')
+        line_buffer[len - 1] = 0;
+    snprintf(file_metadata.genre, sizeof(file_metadata.genre), "%s", line_buffer);
+
+    fgets(line_buffer, 168, fp);
+    len = strlen(line_buffer);
+    if (line_buffer[len - 1] == '\n')
+        line_buffer[len - 1] = 0;
+    snprintf(file_metadata.publisher, sizeof(file_metadata.publisher), "%s", line_buffer);
+
+    fclose(fp);
+
+    return &file_metadata;
+}
+
+// void draw_button(char* label, int x, int y, int width, rg_color_t unselected_color, rg_color_t selected_color, bool selected){
+//     int padding_h = 4;
+//     int padding_v = 4;
+//     rg_color_t *text_color = selected ? &selected_color : &unselected_color;
+//     rg_color_t *border_color = &unselected_color;
+//     rg_color_t *fill_color = selected ? &unselected_color : &selected_color;
+//     rg_rect_t text_bb = rg_gui_draw_text(x, y, width, label, unselected_color, C_TRANSPARENT, RG_TEXT_ALIGN_CENTER);
+
+//     rg_gui_draw_rect(x - padding_h, y - padding_v, text_bb.width + (padding_h * 2), text_bb.height + (padding_v * 2), 0, *border_color, *border_color);
+//     rg_gui_draw_rect(x - padding_h - 1, y - padding_v + 1, text_bb.width + (padding_h * 2) + 2, text_bb.height + (padding_v * 2) - 2, 0, *border_color, *border_color);
+//     rg_gui_draw_rect(x - padding_h - 2, y - padding_v + 2, text_bb.width + (padding_h * 2) + 4, text_bb.height + (padding_v * 2) - 4, 0, *border_color, *border_color);
+    
+//     if (!selected){
+//         rg_gui_draw_rect(x - padding_h, y - padding_v + 1, text_bb.width + (padding_h * 2), text_bb.height + (padding_v * 2) - 2, 0, *border_color, *fill_color);
+//         rg_gui_draw_rect(x - padding_h - 1, y - padding_v + 2, text_bb.width + (padding_h * 2) + 2, text_bb.height + (padding_v * 2) - 4, 0, *border_color, *fill_color);
+//     }
+
+//     rg_gui_draw_text(x, y, width, label, *text_color, C_TRANSPARENT, RG_TEXT_ALIGN_CENTER);
+// }
+
+void application_display_file_details(retro_file_t *file)
+{
+    const char *rom_path = get_file_path(file);
+    char *sram_path = rg_emu_get_path(RG_PATH_SAVE_SRAM, rom_path);
+    rg_emu_state_t *savestate = rg_emu_get_states(rom_path, 4);
+    bool has_save = savestate->used > 0;
+    bool is_fav = bookmark_exists(BOOK_TYPE_FAVORITE, file);
+    const char *rom_meta_path = get_meta_path(file, true);
+    rg_image_t *cover_image = gui_get_themed_image(rom_meta_path);
+    const retro_file_metadata_t* file_metadata = get_file_meta(get_meta_path(file, false));
+    int sel = 0;
+    int options_count = has_save ? 3 : 2;
+    rg_gui_event_t event = RG_DIALOG_INIT;
+    uint32_t joystick = 0, joystick_old;
+    uint64_t joystick_last = 0;
+
+    int details_l_margin =  186;
+    joystick_old = rg_input_read_gamepad();
+    while(joystick_old & RG_KEY_A){
+        joystick_old = rg_input_read_gamepad();
+    }
+
+    while (event != RG_DIALOG_CLOSE)
+    {
+        
+        // TO DO: Add acceleration!
+        joystick_old = ((rg_system_timer() - joystick_last) > 300000) ? 0 : joystick;
+        joystick = rg_input_read_gamepad();
+        event = RG_DIALOG_VOID;
+
+        if (joystick ^ joystick_old)
+        {
+            if (joystick & RG_KEY_UP) {
+                if (--sel < 0) sel = options_count - 1;
+            }
+            else if (joystick & RG_KEY_DOWN) {
+                if (++sel > options_count - 1) sel = 0;
+            }
+            else if (joystick & (RG_KEY_B|RG_KEY_OPTION|RG_KEY_MENU)) {
+                event = RG_DIALOG_DISMISS;
+            }
+            if (joystick & RG_KEY_A) {
+                if ((has_save && sel < 2) || sel == 0) {
+                    crc_cache_save();
+                    gui_save_config();
+                    application_start(file, has_save && sel == 0 ? 0 : -1);
+                    event = RG_DIALOG_DISMISS;
+                } else {
+                    is_fav = !is_fav;
+                    if (is_fav){
+                        bookmark_add(BOOK_TYPE_FAVORITE, file);
+                    } else {
+                        bookmark_remove(BOOK_TYPE_FAVORITE, file);
+                    }
+                }
+            }
+
+            if (event == RG_DIALOG_DISMISS) {
+                event = RG_DIALOG_CLOSE;
+                sel = -1;
+            }
+
+            joystick_last = rg_system_timer();
+        }
+
+        if (rg_input_quit_pressed()){
+            event = RG_DIALOG_CLOSE;
+        } else {
+            gui_draw_rom_details(&file_metadata->name, &file->app->description, &file_metadata->genre, cover_image, has_save, is_fav, sel);
+        }
+
+        if (event == RG_DIALOG_CLOSE)
+            break;
+
+        rg_gui_flush();
+        rg_task_delay(20);
+        rg_system_tick(0);
+    }
+
+    rg_input_wait_for_key(joystick, false);
+
+    rg_display_force_redraw();
+
+    rg_image_free(cover_image);
+
+    free(sram_path);
+    free(savestate);
+}
+
 void application_show_file_menu(retro_file_t *file, bool advanced)
 {
     const char *rom_path = get_file_path(file);
@@ -645,8 +816,6 @@ void application_show_file_menu(retro_file_t *file, bool advanced)
 
     free(sram_path);
     free(savestate);
-
-    // gui_redraw();
 }
 
 static void application(const char *desc, const char *name, const char *exts, const char *part, uint16_t crc_offset)
@@ -683,22 +852,22 @@ static void application(const char *desc, const char *name, const char *exts, co
 void applications_init(void)
 {
     application("Nintendo Entertainment System", "nes", "nes fc fds nsf", "retro-core", 16);
-    application("Super Nintendo", "snes", "smc sfc", "snes9x-go", 0);
+    //application("Super Nintendo", "snes", "smc sfc", "snes9x-go", 0);
     application("Nintendo Gameboy", "gb", "gb gbc", "retro-core", 0);
     application("Nintendo Gameboy Color", "gbc", "gbc gb", "retro-core", 0);
-    application("Nintendo Game & Watch", "gw", "gw", "retro-core", 0);
+    //application("Nintendo Game & Watch", "gw", "gw", "retro-core", 0);
     application("Sega Master System", "sms", "sms sg", "smsplusgx-go", 0);
     application("Sega Game Gear", "gg", "gg", "smsplusgx-go", 0);
-    application("Sega Mega Drive", "md", "md gen bin", "gwenesis", 0);
-    application("Coleco ColecoVision", "col", "col", "smsplusgx-go", 0);
-    application("NEC PC Engine", "pce", "pce", "retro-core", 0);
-    application("Atari Lynx", "lnx", "lnx", "retro-core", 64);
-    // application("Atari 2600", "a26", "a26", "stella-go", 0);
-    // application("Neo Geo Pocket Color", "ngp", "ngp ngc", "ngpocket-go", 0);
-    application("DOOM", "doom", "wad", "prboom-go", 0);
+    //application("Sega Mega Drive", "md", "md gen bin", "gwenesis", 0);
+    //application("Coleco ColecoVision", "col", "col", "smsplusgx-go", 0);
+    //application("NEC PC Engine", "pce", "pce", "retro-core", 0);
+   // application("Atari Lynx", "lnx", "lnx", "retro-core", 64);
+   // application("Atari 2600", "a26", "a26", "stella-go", 0);
+    //application("Neo Geo Pocket Color", "ngp", "ngp ngc", "ngpocket-go", 0);
+    //application("DOOM", "doom", "wad", "prboom-go", 0);
 
     // Special app to bootstrap native esp32 binaries from the SD card
-    application("Bootstrap", "apps", "bin elf", "bootstrap", 0);
+    //application("Bootstrap", "apps", "bin elf", "bootstrap", 0);
 
     crc_cache_init();
 }

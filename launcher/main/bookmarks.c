@@ -10,6 +10,47 @@
 static book_t books[BOOK_TYPE_COUNT];
 
 
+static void tab_refresh(book_t *book)
+{
+    tab_t *tab = book->tab;
+    size_t items_count = 0;
+    char *ext = NULL;
+
+    if (!tab)
+        return;
+
+    memset(&tab->status, 0, sizeof(tab->status));
+
+    if (book->count)
+    {
+        gui_resize_list(tab, book->count);
+        for (int i = 0; i < book->capacity; i++)
+        {
+            retro_file_t *file = &book->items[i];
+            if (file->is_valid)
+            {
+                listbox_item_t *listitem = &tab->listbox.items[items_count++];
+                const char *type = file->app ? file->app->short_name : "n/a";
+                snprintf(listitem->text, 128, "%.100s", file->name);
+                if ((ext = strrchr(listitem->text, '.')))
+                    *ext = 0;
+                listitem->arg = file;
+                listitem->id = i;
+            }
+        }
+    }
+
+    gui_resize_list(tab, items_count);
+    gui_sort_list(tab);
+
+    if (items_count == 0)
+    {
+        gui_resize_list(tab, 0);
+        tab->listbox.cursor = 0;
+    }
+}
+
+
 static void event_handler(gui_event_t event, tab_t *tab)
 {
     listbox_item_t *item = gui_get_selected_item(tab);
@@ -42,54 +83,15 @@ static void event_handler(gui_event_t event, tab_t *tab)
     }
     else if (event == TAB_ACTION)
     {
-        if (file)
-            application_show_file_menu(file, false);
+        if (file){
+            application_display_file_details(file);
+            book_t *book = (book_t *)tab->arg;
+            tab_refresh(book);
+        }
     }
     else if (event == TAB_BACK)
     {
         // This is now reserved for subfolder navigation (go back)
-    }
-}
-
-static void tab_refresh(book_t *book)
-{
-    tab_t *tab = book->tab;
-    size_t items_count = 0;
-
-    if (!tab)
-        return;
-
-    memset(&tab->status, 0, sizeof(tab->status));
-
-    if (book->count)
-    {
-        gui_resize_list(tab, book->count);
-        for (int i = 0; i < book->capacity; i++)
-        {
-            retro_file_t *file = &book->items[i];
-            if (file->is_valid)
-            {
-                listbox_item_t *listitem = &tab->listbox.items[items_count++];
-                const char *type = file->app ? file->app->short_name : "n/a";
-                snprintf(listitem->text, 128, "[%-3s] %.100s", type, file->name);
-                listitem->arg = file;
-                listitem->id = i;
-            }
-        }
-    }
-
-    gui_resize_list(tab, items_count);
-    gui_sort_list(tab);
-
-    if (items_count == 0)
-    {
-        gui_resize_list(tab, 6);
-        sprintf(tab->listbox.items[0].text, "Welcome to Retro-Go!");
-        sprintf(tab->listbox.items[1].text, " ");
-        sprintf(tab->listbox.items[2].text, "You have no %s games", book->name);
-        sprintf(tab->listbox.items[3].text, " ");
-        sprintf(tab->listbox.items[4].text, "You can hide this tab in the menu");
-        tab->listbox.cursor = 3;
     }
 }
 
@@ -192,6 +194,7 @@ static void book_init(book_type_t book_type, const char *name, const char *desc,
 
     book->name = strdup(name);
     book->path = strdup(path);
+    printf("application_path_to_file %s \n", book->path);
     book->capacity = capacity;
     book->count = 0;
     book->items = calloc(capacity + 1, sizeof(retro_file_t));

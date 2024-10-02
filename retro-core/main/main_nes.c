@@ -249,13 +249,16 @@ void nes_main(void)
 
         if (joystick & (RG_KEY_MENU|RG_KEY_OPTION))
         {
-            if (joystick & RG_KEY_MENU)
-                rg_gui_game_menu();
-            else
-                rg_gui_options_menu();
-            rg_audio_set_sample_rate(app->sampleRate * app->speed);
-            if (nsfPlayer)
-                rg_display_clear(C_BLACK);
+            // if (joystick & RG_KEY_MENU)
+            //     rg_gui_game_menu();
+            // else
+            //     rg_gui_options_menu();
+            // rg_audio_set_sample_rate(app->sampleRate * app->speed);
+            // if (nsfPlayer)
+            //     rg_display_clear(C_BLACK);
+            rg_audio_set_mute(true);
+            rg_emu_save_state(0);
+            rg_system_switch_app(RG_APP_LAUNCHER, 0, 0, 0);
         }
 
         int64_t startTime = rg_system_timer();

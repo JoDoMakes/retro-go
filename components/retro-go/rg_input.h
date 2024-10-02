@@ -32,3 +32,5 @@ void rg_input_wait_for_key(rg_key_t key, bool pressed);
 const char *rg_input_get_key_name(rg_key_t key);
 uint32_t rg_input_read_gamepad(void);
 bool rg_input_read_battery(float *percent, float *volts);
+bool rg_input_quit_pressed();
+void rg_input_set_volume_settings(bool volume_fixed, int volume_level);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../retro-go/rg_gui.h"
 #include <rg_gui.h>
 #include <stdbool.h>
 
@@ -70,11 +71,11 @@ typedef struct {
 } listbox_item_t;
 
 typedef struct {
-    // listbox_item_t **items;
     listbox_item_t *items;
     int capacity;
     int length;
     int cursor;
+    int start;
     int sort_mode;
 } listbox_t;
 
@@ -163,3 +164,9 @@ void gui_draw_background(tab_t *tab, int shade);
 void gui_draw_header(tab_t *tab, int offset);
 void gui_draw_status(tab_t *tab);
 void gui_draw_list(tab_t *tab);
+rg_image_t *gui_get_themed_image(const char *image_path);
+void gui_draw_default_background();
+void gui_draw_rom_details(char *title, char *system_name, char *genre, rg_image_t *cover_image, bool has_save, bool is_fav, int selected);
+void draw_button(char* label, int x, int y, int width, bool selected);
+void gui_draw_optionlist(listbox_t *list);
+void gui_draw_radio_group(listbox_t *list);

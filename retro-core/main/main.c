@@ -27,8 +27,10 @@ void app_main(void)
         lynx_main();
     else if (strcmp(app->configNs, "snes") == 0)
         snes_main();
-    else
+    else {
+        rg_audio_set_mute(true);
         launcher_main();
+    }
 
     RG_PANIC("Never reached");
 }
